@@ -2,57 +2,70 @@
 jQuery(document).ready(function($) {
 
     /**
-     * Live Search Logic
+     * Client-side Game Filtering Logic
      */
     const searchInput = $('#searchInput');
-    const searchResultsContainer = $('#liveSearchResults');
-    let searchTimeout;
 
-    if (searchInput.length && searchResultsContainer.length) {
-        searchInput.on('keyup', function() {
-            clearTimeout(searchTimeout);
-            const query = $(this).val();
+    if (searchInput.length) {
+        // Новая логика фильтрации
+        searchInput.on('input', function() {
+            const searchTerm = $(this).val().toLowerCase().trim();
+            
+            $('.games-grid').each(function() {
+                const gamesGrid = $(this);
+                const gameCards = gamesGrid.find('.game-card');
+                let visibleGames = 0;
 
-            if (query.length > 2) { // Minimum characters to trigger search
-                searchResultsContainer.html('<p>' + 'Loading...' + '</p>').show(); // Basic loading text
-                searchTimeout = setTimeout(function() {
-                    $.ajax({
-                        url: igroport_ajax.ajax_url,
-                        type: 'POST',
-                        data: {
-                            action: 'live_search_games',
-                            query: query,
-                            nonce: igroport_ajax.live_search_nonce
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                searchResultsContainer.html(response.data.html).show();
-                            } else {
-                                searchResultsContainer.html('<p>' + (response.data.html || 'Error loading results.') + '</p>').show();
-                            }
-                        },
-                        error: function() {
-                            searchResultsContainer.html('<p>' + 'Search request failed.' + '</p>').show();
-                        }
-                    });
-                }, 500); // Debounce time: 500ms
-            } else {
-                searchResultsContainer.empty().hide();
+                gameCards.each(function() {
+                    const card = $(this);
+                    const gameTitleElement = card.find('h3, h4'); 
+                    const gameName = gameTitleElement.text().toLowerCase();
+
+                    if (gameName.includes(searchTerm)) {
+                        card.show();
+                        visibleGames++;
+                    } else {
+                        card.hide();
+                    }
+                });
+
+                gamesGrid.siblings('.no-results-filter-message').remove();
+
+                if (visibleGames === 0 && searchTerm !== '') {
+                    gamesGrid.after('<p class="no-results-filter-message" style="text-align:center; color: var(--text-color); padding: 20px 0;">No games found matching your search in this section.</p>');
+                }
+            });
+
+            if (searchTerm === '') {
+                $('.games-grid .game-card').show();
+                $('.no-results-filter-message').remove();
             }
         });
 
-        // Hide results when clicking outside
-        $(document).on('click', function(e) {
-            if (!$(e.target).closest('.search-container').length) {
-                searchResultsContainer.empty().hide();
-            }
-        });
-        
-        // Prevent hiding when clicking inside search input itself
-        searchInput.on('focus', function() {
-            if (searchResultsContainer.html() !== '') { // Only show if there's content (e.g. after typing)
-                 if ($(this).val().length > 2) searchResultsContainer.show();
-            }
+        const searchForm = searchInput.closest('form');
+        if (searchForm.length) {
+            searchForm.on('submit', function(e) {
+                e.preventDefault(); 
+            });
+        }
+    }
+
+    /**
+     * Mobile Menu Toggle
+     */
+    const mobileMenuToggle = $('.mobile-menu-toggle');
+    const primaryMenu = $('#primary-menu-ul'); // The <ul> element for the primary menu
+
+    if (mobileMenuToggle.length && primaryMenu.length) {
+        mobileMenuToggle.on('click', function() {
+            $(this).toggleClass('active');
+            primaryMenu.toggleClass('active'); // Toggle class on the menu ul
+            
+            // Optionally, toggle a class on the body if you need to prevent scrolling, etc.
+            // $('body').toggleClass('mobile-menu-open');
+            
+            const isExpanded = $(this).attr('aria-expanded') === 'true' || false;
+            $(this).attr('aria-expanded', !isExpanded);
         });
     }
 
@@ -63,30 +76,28 @@ jQuery(document).ready(function($) {
     if ($('body').is('.single-game, .game-as-front-page')) {
         const playButton = $('#playButton');
         const gamePlaceholderImage = $('#gamePlaceholderImage');
-        const gameLaunchControls = $('#gameLaunchControls'); // Container for placeholder and play button
-        const gameIframeWrapper = $('#gameIframeWrapper'); // Wrapper for the iframe
+        const gameLaunchControls = $('#gameLaunchControls'); 
+        const gameIframeWrapper = $('#gameIframeWrapper'); 
         const gameIframe = $('#gameIframe');
         const fullscreenButton = $('#fullscreenButton');
         const gamePostId = $('#starRatingSection').data('post-id');
 
         function startGame() {
             if (gameLaunchControls.length && gameIframeWrapper.length && gameIframe.length) {
-                gameLaunchControls.hide(); // Hide placeholder and play button container
+                gameLaunchControls.hide(); 
                 
                 const encodedGameUrl = gameIframe.data('encoded-src');
                 if (encodedGameUrl) {
                     try {
                         const decodedGameUrl = atob(encodedGameUrl);
                         gameIframe.attr('src', decodedGameUrl);
-                        gameIframeWrapper.show(); // Show iframe wrapper
+                        gameIframeWrapper.show(); 
                     } catch (e) {
                         console.error('Error decoding game URL:', e);
-                        // If gameIframeWrapper was hidden, show it to display error
                         gameIframeWrapper.show().html('<p style="color:white;text-align:center;padding-top:50px;">Could not load game: Invalid URL format.</p>');
                     }
                 } else {
                     console.error('Encoded game URL (data-encoded-src) not found on iframe.');
-                     // If gameIframeWrapper was hidden, show it to display error
                     gameIframeWrapper.show().html('<p style="color:white;text-align:center;padding-top:50px;">Could not load game: URL not found.</p>');
                 }
 
@@ -101,7 +112,7 @@ jQuery(document).ready(function($) {
 
         if (fullscreenButton.length && gameIframeWrapper.length) {
             fullscreenButton.on('click', function() {
-                const el = gameIframeWrapper[0]; // Target the iframe wrapper for fullscreen
+                const el = gameIframeWrapper[0]; 
                 if (el.requestFullscreen) el.requestFullscreen();
                 else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
                 else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
@@ -230,54 +241,7 @@ jQuery(document).ready(function($) {
         }
     }
 
-    /**
-     * Logic for "Load More"
-     */
-    const loadMoreBtn = $('#loadMoreBtn');
-    if (loadMoreBtn.length) {
-        let currentMaxPages = parseInt(loadMoreBtn.data('max-pages'));
-
-        loadMoreBtn.on('click', function() {
-            const button = $(this);
-            let currentPage = parseInt(button.data('paged'));
-            const maxPagesToCompare = currentMaxPages || parseInt(button.data('max-pages'));
-
-            button.text('Loading...');
-
-            $.ajax({
-                url: igroport_ajax.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'load_more_games',
-                    paged: currentPage,
-                    nonce: igroport_ajax.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $('#gamesGrid').append(response.data.html);
-                        currentPage++;
-                        button.data('paged', currentPage);
-                        
-                        if (response.data.max_pages) {
-                            currentMaxPages = parseInt(response.data.max_pages);
-                        }
-
-                        if (currentPage > currentMaxPages) {
-                            button.addClass('hidden').hide();
-                        } else {
-                             button.text('Load More Games');
-                        }
-                    } else {
-                        button.text('No More Games');
-                        console.log('Load more error:', response.data.message);
-                        button.addClass('hidden').hide();
-                    }
-                },
-                error: function(errorThrown) {
-                    console.error('AJAX error:', errorThrown);
-                    button.text('Loading Error');
-                }
-            });
-        });
-    }
+    // Логика "Load More" удалена
+    // const loadMoreBtn = $('#loadMoreBtn');
+    // if (loadMoreBtn.length) { ... }
 });
